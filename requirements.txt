@@ -1,0 +1,6 @@
+scikit-learn>=0.20.0
+sklearn
+matplotlib
+configparser
+scipy
+seaborn
