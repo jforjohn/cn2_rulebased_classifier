@@ -72,6 +72,8 @@ if __name__ == '__main__':
                 min_significance=min_significance,
                 negate=negate,
                 disjunctive=disjunctive)
+    start = time()
     cn2.fit(df)
+    print('duration', time()-start)
 
     #labels = preprocess.labels_
