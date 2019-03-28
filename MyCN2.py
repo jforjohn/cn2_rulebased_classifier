@@ -7,10 +7,11 @@ from matplotlib import style
 style.use('ggplot')
 
 class MyCN2(BaseEstimator, TransformerMixin):
-    def __init__(self, beam_width=3, min_significance=0.5, negate=True):
+    def __init__(self, beam_width=3, min_significance=0.5, negate=False, disjunctive=False):
         self.beam_width = beam_width
         self.min_significance = min_significance
         self.negate = negate
+        self.disjunctive = disjunctive
         pd.set_option('display.max_rows', 500)
         pd.set_option('display.max_columns', 500)
         pd.set_option('display.max_colwidth', 1000)
@@ -34,7 +35,6 @@ class MyCN2(BaseEstimator, TransformerMixin):
                     selectors.append([(col, val, True)])
         self.selectors = selectors
 
-
         #df_star = self.build_star()
         #star = df_star.iloc[:self.beam_width-1, :]
         #best_cpx = star['rule'].iloc[0]
@@ -50,7 +50,6 @@ class MyCN2(BaseEstimator, TransformerMixin):
             print(df_best)
             print('##################')
 
-            
             if best_cpx:
                 # rule as dictionary key:attr, value: attr's value
 
@@ -61,6 +60,8 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 # remove from e the e_prime
                 e = e[~rule_filter]
                 print(e.shape)
+        print('negate', self.negate)
+        print('disjunctive', self.disjunctive)
         return self
 
 
@@ -74,7 +75,11 @@ class MyCN2(BaseEstimator, TransformerMixin):
             new_star = list(filter(None, self.specialization(star)))
             print(len(new_star))
             rule_lst = []
+            i = 0
             for cpx in new_star:
+                i += 1
+                if i % 5000 == 0:
+                    print(i)
                 rule_stats = {}
                 
                 rule_filter = self.build_rule_filter(cpx, e)
@@ -121,6 +126,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
 
 
     def specialization(self, star):
+        print(len(star))
         specializations_lst = [[]]
         for s_item in star:
             star_cp = s_item#.copy()
@@ -133,7 +139,6 @@ class MyCN2(BaseEstimator, TransformerMixin):
                         for spec_item in specializations_lst:
                             if not set(spec_item).intersection(new_specialization):
                                 specializations_lst.append(star_cp+[selector[0]])
-
                 else:
                     # initial condition
                     specializations_lst = self.selectors
@@ -150,36 +155,35 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 rule_pos[att] = [val]
 
         if rule_pos:
-            rule_filter_pos= e[rule_pos.keys()].isin(rule_pos).any(axis=1)
+            if self.disjunctive:
+                rule_filter_pos= e[rule_pos.keys()].isin(rule_pos).any(axis=1)
+            else:
+                rule_filter_pos= e[rule_pos.keys()].isin(rule_pos).all(axis=1)
         else:
-            rule_filter_pos = True
+            if self.disjunctive:
+                rule_filter_pos = False
+            else:
+                rule_filter_pos = True
         
         if rule_neg:
-            rule_filter_neg = ~e[rule_neg.keys()].isin(rule_neg).any(axis=1)
+            if self.disjunctive:
+                rule_filter_neg = ~e[rule_neg.keys()].isin(rule_neg).any(axis=1)
+            else:
+                rule_filter_neg = ~e[rule_neg.keys()].isin(rule_neg).all(axis=1)
         else:
-            rule_filter_neg = True
+            if self.disjunctive:
+                rule_filter_neg = False
+            else:
+                rule_filter_neg = True
 
-        return rule_filter_pos & rule_filter_neg
+        if self.disjunctive:
+            rule_filter = rule_filter_pos | rule_filter_neg
+        else:
+            rule_filter = rule_filter_pos & rule_filter_neg
+        return rule_filter 
     
 
     def calc_significance(self, class_freq, complex_coverage_size, global_class_freqs, df_shape):
         fi = class_freq/complex_coverage_size
         ei = global_class_freqs/df_shape[0]
         return 2*(fi*np.log(fi/ei)).sum()
-
-
-'''
-data = np.array([[2,3],
-                 [3,5],
-                 [1,4],
-                 [10,12],
-                 [11,13],
-                 [12,10]])
-
-plt.scatter(data[:,0], data[:,1], s=100)
-#plt.show()
-df = pd.DataFrame(data)
-
-clf = MyCN2()
-
-'''
