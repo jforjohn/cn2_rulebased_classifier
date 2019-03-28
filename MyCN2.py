@@ -29,7 +29,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
         selectors = []
         # don't use class column
         for col in e.columns[:-1]:
-            for val in e[col].unique():
+            for val in e.loc[:, col].unique():
                 selectors.append([(col, val, False)])
                 if self.negate:
                     selectors.append([(col, val, True)])
@@ -39,27 +39,54 @@ class MyCN2(BaseEstimator, TransformerMixin):
         #star = df_star.iloc[:self.beam_width-1, :]
         #best_cpx = star['rule'].iloc[0]
         best_cpx = [[]]
-        df_best = pd.DataFrame()
+        df_rules = pd.DataFrame()
         #best_significance
         while not e.empty and best_cpx:
             df_best_cpx, best_cpx = self.find_best_complex(e, 
                                                            global_class_freqs,
                                                            df_shape)
-            df_best = df_best.append(df_best_cpx)
+            df_rules = df_rules.append(df_best_cpx)
             print('##################')
-            print(df_best)
+            print(df_rules)
             print('##################')
 
             if best_cpx:
                 # rule as dictionary key:attr, value: attr's value
 
                 rule_filter = self.build_rule_filter(best_cpx, e)
+                print('oooooooooooooooooooo')
+                print(e[rule_filter].loc[:, 'Class'].value_counts())
+                print('oooooooooooooooooooo')
                 #complex_coverage = e[rule_filter]
                 #e_prime = e[rule_filter]
 
                 # remove from e the e_prime
                 e = e[~rule_filter]
                 print(e.shape)
+        
+        rule_stats = {}
+        rule_default = [('True')]
+        rule_stats['rule'] = rule_default
+        if e.shape[0] > 0:
+            class_freq = e.loc[:, 'Class'].value_counts()
+        else:
+            class_freq = global_class_freqs
+        rule_stats['entropy'] = entropy(class_freq, base=2)
+        rule_stats['length'] = len(rule_default)
+        rule_stats['coverage'] = e.shape[0]
+        # the prediction is the most frequent class
+        rule_stats['prediction'] = class_freq.index[0]
+        # take the most frequent class for this rule
+        rule_stats['precision'] = class_freq[0]/class_freq.sum()
+        most_freq_class_in_dataset = global_class_freqs.loc[class_freq.index[0]]
+        rule_stats['recall'] = class_freq[0] / most_freq_class_in_dataset
+        rule_stats['significance'] = self.calc_significance(class_freq, 
+                                                            e.shape[0],
+                                                            global_class_freqs,
+                                                            df_shape)
+
+        self.df_rules = df_rules.append(pd.DataFrame([rule_stats]))
+        print(self.df_rules)
         print('negate', self.negate)
         print('disjunctive', self.disjunctive)
         return self
@@ -73,7 +100,15 @@ class MyCN2(BaseEstimator, TransformerMixin):
         results = pd.DataFrame()
         while len(star) > 0 and best_significance > self.min_significance:
             new_star = list(filter(None, self.specialization(star)))
-            print(len(new_star))
+            print('-----------------')
+            print('len star sent', len(star))
+            print('star sent')
+            print(star)
+            print('---------             --------')
+            print('new star produced')
+            print(new_star)
+            print('-----------------')
+            print('len new_star', len(new_star))
             rule_lst = []
             i = 0
             for cpx in new_star:
@@ -88,7 +123,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 # stats
                 if complex_coverage.size > 0:
                     rule_stats['rule'] = cpx
-                    class_freq = complex_coverage['Class'].value_counts()
+                    class_freq = complex_coverage.loc[:, 'Class'].value_counts()
                     rule_stats['entropy'] = entropy(class_freq, base=2)
                     rule_stats['length'] = len(cpx)
                     rule_stats['coverage'] = complex_coverage.shape[0]
@@ -106,14 +141,15 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 #else:
                 #    del new_star[ind]
             if rule_lst:
-                sort_order = ['entropy', 'significance', 'coverage']
+                sort_order = ['entropy', 'significance', 'length', 'coverage']
                 #sort_order = ['coverage', 'entropy', 'significance']
-                asc_order = [True, False, False]
+                asc_order = [True, False, True, False]
                 df_best_cpxs = pd.DataFrame(rule_lst).sort_values(by=sort_order,
                         ascending=asc_order).iloc[:self.beam_width-1]
 
+                print('df_best_cpxs', df_best_cpxs)
                 results = results.append(df_best_cpxs)
-                print(results)
+                print('results', results)
                 results = results.sort_values(by=sort_order,
                             ascending=asc_order).iloc[:self.beam_width]
 
@@ -126,7 +162,6 @@ class MyCN2(BaseEstimator, TransformerMixin):
 
 
     def specialization(self, star):
-        print(len(star))
         specializations_lst = [[]]
         for s_item in star:
             star_cp = s_item#.copy()
@@ -136,13 +171,22 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 if star_cp:
                     if selector_attr not in [attr for attr, _, _ in star_cp]:
                         new_specialization = star_cp+[selector[0]]
-                        for spec_item in specializations_lst:
-                            if not set(spec_item).intersection(new_specialization):
-                                specializations_lst.append(star_cp+[selector[0]])
+                        ind = 0
+                        foundSame = False
+                        print('specializations_lst')
+                        print(specializations_lst)
+                        while ind < len(specializations_lst) and not foundSame:
+                            spec_item = specializations_lst[ind]
+                            new_spec_intersection = set(spec_item).intersection(new_specialization)
+                            if len(new_spec_intersection) == len(new_specialization):
+                                foundSame = True
+                            ind += 1
+                        if not foundSame:
+                            specializations_lst.append(new_specialization)
                 else:
                     # initial condition
-                    specializations_lst = self.selectors
-                    return specializations_lst
+                    print('len selectors', len(self.selectors))
+                    return self.selectors
         return specializations_lst
             
     def build_rule_filter(self, cpx, e):
@@ -187,3 +231,20 @@ class MyCN2(BaseEstimator, TransformerMixin):
         fi = class_freq/complex_coverage_size
         ei = global_class_freqs/df_shape[0]
         return 2*(fi*np.log(fi/ei)).sum()
+
+    def predict(self, dt, y):
+        if isinstance(dt, pd.DataFrame):
+            df_test = dt
+        elif isinstance(dt, np.ndarray):
+            df_test = pd.DataFrame(dt)
+        else:
+            raise Exception('dt should be a DataFrame or a numpy array')
+        
+        if isinstance(y, pd.DataFrame):
+            y_test = y
+        elif isinstance(dt, np.ndarray):
+            y_test = pd.DataFrame(y)
+        else:
+            raise Exception('y should be a DataFrame or a numpy array')
+        
+
