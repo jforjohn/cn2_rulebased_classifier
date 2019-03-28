@@ -32,21 +32,33 @@ if __name__ == '__main__':
         sys.exit(1)
     
     try:
-        bins_no = int(config.get('cn2', 'bins_no'))
+        bins_no = config.getint('cn2', 'bins_no')
     except ValueError:
         print('bins_no should be integer')
         sys.exit(1)
 
     try:
-        beam_width = int(config.get('cn2', 'beam_width'))
+        beam_width = config.getint('cn2', 'beam_width')
     except ValueError:
         print('beam_width should be integer')
         sys.exit(1)
 
     try:
-        min_significance = float(config.get('cn2', 'min_significance'))
+        min_significance = config.getfloat('cn2', 'min_significance')
     except ValueError:
         print('min_significance should be float')
+        sys.exit(1)
+
+    try:
+        negate = config.getboolean('cn2', 'negate')
+    except ValueError:
+        print('negate should be boolean or yes/no')
+        sys.exit(1)
+
+    try:
+        disjunctive = config.getboolean('cn2', 'disjunctive')
+    except ValueError:
+        print('disjunctive should be boolean or yes/no')
         sys.exit(1)
 
     ## Preprocessing
@@ -57,7 +69,9 @@ if __name__ == '__main__':
     #print(df.head())
     #print(labels.dtypes)
     cn2 = MyCN2(beam_width=beam_width,
-                min_significance=min_significance)
+                min_significance=min_significance,
+                negate=negate,
+                disjunctive=disjunctive)
     cn2.fit(df)
 
     #labels = preprocess.labels_
