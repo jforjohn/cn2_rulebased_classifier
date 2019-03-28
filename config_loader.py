@@ -9,7 +9,9 @@ def load(config_file):
     requiredConfig = {
         'cn2': ['dataset',
                 'bins_no',
-                'beam_width'
+                'beam_width',
+                'min_significance',
+                'negate'
         	   ],
     }
     try:
