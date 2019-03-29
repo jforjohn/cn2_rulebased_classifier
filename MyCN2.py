@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib import style
 style.use('ggplot')
 
+
 class MyCN2(BaseEstimator, TransformerMixin):
     def __init__(self, beam_width=3, min_significance=0.5, negate=False, disjunctive=False):
         self.beam_width = beam_width
@@ -46,23 +47,23 @@ class MyCN2(BaseEstimator, TransformerMixin):
                                                            global_class_freqs,
                                                            df_shape)
             df_rules = df_rules.append(df_best_cpx)
-            print('##################')
-            print(df_rules)
-            print('##################')
+            #print('##################')
+            #print(df_rules)
+            #print('##################')
 
             if best_cpx:
                 # rule as dictionary key:attr, value: attr's value
 
                 rule_filter = self.build_rule_filter(best_cpx, e)
-                print('oooooooooooooooooooo')
-                print(e[rule_filter].loc[:, 'Class'].value_counts())
-                print('oooooooooooooooooooo')
+                #print('oooooooooooooooooooo')
+                #print(e[rule_filter].loc[:, 'Class'].value_counts())
+                #print('oooooooooooooooooooo')
                 #complex_coverage = e[rule_filter]
                 #e_prime = e[rule_filter]
 
                 # remove from e the e_prime
                 e = e[~rule_filter]
-                print(e.shape)
+                #print(e.shape)
         
         rule_stats = {}
         rule_default = [('True')]
@@ -86,6 +87,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
                                                             df_shape)
 
         self.df_rules = df_rules.append(pd.DataFrame([rule_stats]))
+        self.df_rules.reset_index(drop=True, inplace=True)
         print(self.df_rules)
         print('negate', self.negate)
         print('disjunctive', self.disjunctive)
@@ -100,6 +102,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
         results = pd.DataFrame()
         while len(star) > 0 and best_significance > self.min_significance:
             new_star = list(filter(None, self.specialization(star)))
+            '''
             print('-----------------')
             print('len star sent', len(star))
             print('star sent')
@@ -109,12 +112,9 @@ class MyCN2(BaseEstimator, TransformerMixin):
             print(new_star)
             print('-----------------')
             print('len new_star', len(new_star))
+            '''
             rule_lst = []
-            i = 0
             for cpx in new_star:
-                i += 1
-                if i % 5000 == 0:
-                    print(i)
                 rule_stats = {}
                 
                 rule_filter = self.build_rule_filter(cpx, e)
@@ -147,9 +147,9 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 df_best_cpxs = pd.DataFrame(rule_lst).sort_values(by=sort_order,
                         ascending=asc_order).iloc[:self.beam_width-1]
 
-                print('df_best_cpxs', df_best_cpxs)
+                #print('df_best_cpxs', df_best_cpxs)
                 results = results.append(df_best_cpxs)
-                print('results', results)
+                #print('results', results)
                 results = results.sort_values(by=sort_order,
                             ascending=asc_order).iloc[:self.beam_width]
 
@@ -173,8 +173,8 @@ class MyCN2(BaseEstimator, TransformerMixin):
                         new_specialization = star_cp+[selector[0]]
                         ind = 0
                         foundSame = False
-                        print('specializations_lst')
-                        print(specializations_lst)
+                        #print('specializations_lst')
+                        #print(specializations_lst)
                         while ind < len(specializations_lst) and not foundSame:
                             spec_item = specializations_lst[ind]
                             new_spec_intersection = set(spec_item).intersection(new_specialization)
@@ -185,10 +185,108 @@ class MyCN2(BaseEstimator, TransformerMixin):
                             specializations_lst.append(new_specialization)
                 else:
                     # initial condition
-                    print('len selectors', len(self.selectors))
                     return self.selectors
         return specializations_lst
+
+    def predict(self, dt, y):
+        if isinstance(dt, pd.DataFrame):
+            df_test = dt
+        elif isinstance(dt, np.ndarray):
+            df_test = pd.DataFrame(dt)
+        else:
+            raise Exception('dt should be a DataFrame or a numpy array')
+        
+        if isinstance(y, pd.DataFrame):
+            y_test = y.copy()
+        elif isinstance(dt, np.ndarray):
+            y_test = pd.DataFrame(y.copy())
+        else:
+            raise Exception('y should be a DataFrame or a numpy array')
+        
+        if not hasattr(self, 'df_rules'):
+            raise Exception('The model has to be fitted first')
+
+        y_test.loc[:, 'Predictions'] = np.nan
+
+        global_class_freqs = df_test.loc[:, 'Class'].value_counts()
+        df_shape = df_test.shape
+        df_results = pd.DataFrame()
+        rule_lst = []
+        # don't iterate through the default rule
+        last_rule_ind = self.df_rules.shape[0]-2
+        for ind, rule in enumerate(self.df_rules.loc[:last_rule_ind, 'rule']):
+            print('test shape', df_test.shape)
+            rule_stats = {}
             
+            rule_filter = self.build_rule_filter(rule, df_test)
+
+            complex_coverage = df_test[rule_filter]
+            #complex_coverage_labels = y_test[rule_filter]
+            
+            # stats
+
+            if complex_coverage.size > 0:
+                rule_stats['rule'] = rule
+                # the prediction is the most frequent class
+                prediction = self.df_rules.loc[ind, 'prediction']
+                rule_stats['prediction'] = prediction
+                y_test.loc[complex_coverage.index, 'Predictions'] = prediction
+                # what's the frequency of 
+                class_freq = complex_coverage[complex_coverage.loc[:,'Class']==prediction].loc[:, 'Class'].value_counts()
+                rule_stats['entropy'] = entropy(class_freq, base=2)
+                rule_stats['length'] = len(rule)
+                rule_stats['coverage'] = complex_coverage.shape[0]
+
+                rule_stats['train_precision'] = self.df_rules.loc[ind, 'precision']
+                 # take the most frequent class for this rule
+                rule_stats['true_most_freq_value'] = complex_coverage.loc[:,'Class'].value_counts().index[0]
+                rule_stats['correct'] = class_freq[0]
+                rule_stats['accuracy'] = class_freq[0]/complex_coverage.shape[0]
+                most_freq_class_in_dataset = global_class_freqs.loc[class_freq.index[0]]
+                rule_stats['recall'] = class_freq[0] / most_freq_class_in_dataset
+                rule_stats['significance'] = self.calc_significance(class_freq, 
+                                                                complex_coverage.shape[0],
+                                                                global_class_freqs,
+                                                                df_shape)
+                rule_lst.append(rule_stats)
+            df_test = df_test[~rule_filter]
+        if df_test.shape[0] > 0:
+            print('DEFAULT')
+            complex_coverage = df_test
+            ind = self.df_rules.shape[0]-2
+            rule = self.df_rules.loc[ind, 'rule']
+            prediction = self.df_rules.loc[ind, 'prediction']
+            rule_stats['prediction'] = prediction
+            y_test.loc[complex_coverage.index, 'Predictions'] = prediction
+            # what's the frequency of 
+            class_freq = complex_coverage[complex_coverage.loc[:,'Class']==prediction].loc[:, 'Class'].value_counts()
+            rule_stats['entropy'] = entropy(class_freq, base=2)
+            rule_stats['length'] = len(rule)
+            rule_stats['coverage'] = complex_coverage.shape[0]
+
+            rule_stats['train_precision'] = self.df_rules.loc[ind, 'precision']
+                # take the most frequent class for this rule
+            rule_stats['true_most_freq_value'] = complex_coverage.loc[:,'Class'].value_counts().index[0]
+            rule_stats['correct'] = class_freq[0]
+            rule_stats['accuracy'] = class_freq[0]/complex_coverage.shape[0]
+            most_freq_class_in_dataset = global_class_freqs.loc[class_freq.index[0]]
+            rule_stats['recall'] = class_freq[0] / most_freq_class_in_dataset
+            rule_stats['significance'] = self.calc_significance(class_freq, 
+                                                            complex_coverage.shape[0],
+                                                            global_class_freqs,
+                                                            df_shape)
+            rule_lst.append(rule_stats)
+
+        print(y_test)
+        df_results = pd.DataFrame(rule_lst)
+        print(df_results)
+        return y_test.loc[:, 'Predictions']
+
+    def calc_significance(self, class_freq, complex_coverage_size, global_class_freqs, df_shape):
+        fi = class_freq/complex_coverage_size
+        ei = global_class_freqs/df_shape[0]
+        return 2*(fi*np.log(fi/ei)).sum()
+
     def build_rule_filter(self, cpx, e):
         rule_pos = {}
         rule_neg = {}
@@ -225,26 +323,3 @@ class MyCN2(BaseEstimator, TransformerMixin):
         else:
             rule_filter = rule_filter_pos & rule_filter_neg
         return rule_filter 
-    
-
-    def calc_significance(self, class_freq, complex_coverage_size, global_class_freqs, df_shape):
-        fi = class_freq/complex_coverage_size
-        ei = global_class_freqs/df_shape[0]
-        return 2*(fi*np.log(fi/ei)).sum()
-
-    def predict(self, dt, y):
-        if isinstance(dt, pd.DataFrame):
-            df_test = dt
-        elif isinstance(dt, np.ndarray):
-            df_test = pd.DataFrame(dt)
-        else:
-            raise Exception('dt should be a DataFrame or a numpy array')
-        
-        if isinstance(y, pd.DataFrame):
-            y_test = y
-        elif isinstance(dt, np.ndarray):
-            y_test = pd.DataFrame(y)
-        else:
-            raise Exception('y should be a DataFrame or a numpy array')
-        
-
