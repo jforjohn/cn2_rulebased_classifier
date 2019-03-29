@@ -6,6 +6,8 @@ from MyPreprocessing import MyPreprocessing
 from MyCN2 import MyCN2
 import sys
 from time import time
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
 ##
 
@@ -66,14 +68,21 @@ if __name__ == '__main__':
     preprocess.fit(data)
     df = preprocess.new_df
     labels = preprocess.labels_
-    #print(df.head())
-    #print(labels.dtypes)
+
+    x_train, x_test, y_train, y_test = train_test_split(
+        df , labels, train_size=0.7, random_state=42, stratify=labels)
+    print(x_test.head())
+    print(y_test.head())
     cn2 = MyCN2(beam_width=beam_width,
                 min_significance=min_significance,
                 negate=negate,
                 disjunctive=disjunctive)
     start = time()
-    cn2.fit(df)
+    cn2.fit(x_train)
     print('duration', time()-start)
 
-    #labels = preprocess.labels_
+    pred = cn2.predict(x_test, y_test)
+    print('Precision, Recall, F-Score:')
+    print(precision_recall_fscore_support(y_test.values, pred.values))
+    print('Accuracy')
+    print(accuracy_score(y_test.values, pred.values))
