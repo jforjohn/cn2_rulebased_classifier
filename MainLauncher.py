@@ -69,6 +69,10 @@ if __name__ == '__main__':
         print('train_percentage should be float, default: 0.7')
         train_percentage = 0.7
 
+    print("###")
+    print(dataset)
+    print("###")
+    
     ## Preprocessing
     preprocess = MyPreprocessing(bins_no=bins_no)
     preprocess.fit(data)
@@ -77,18 +81,26 @@ if __name__ == '__main__':
 
     x_train, x_test, y_train, y_test = train_test_split(
         df , labels, train_size=train_percentage, random_state=42, stratify=labels)
-    print(x_test.head())
-    print(y_test.head())
+
     cn2 = MyCN2(beam_width=beam_width,
                 min_significance=min_significance,
                 negate=negate,
                 disjunctive=disjunctive)
     start = time()
     cn2.fit(x_train)
-    print('duration', time()-start)
+    print('Train duration', time()-start)
 
+    start = time()
     pred = cn2.predict(x_test, y_test)
+    print('Test duration', time()-start)
+
     print('Precision, Recall, F-Score:')
     print(precision_recall_fscore_support(y_test.values, pred.values))
+    print()
+    print('Unique labels:')
+    print(labels.loc[:, 'Class'].unique())
+    print()
+    print('Precision, Recall, F-Score per label:')
+    print(precision_recall_fscore_support(y_test.values, pred.values, labels=labels.loc[:, 'Class'].unique()))
     print('Accuracy')
     print(accuracy_score(y_test.values, pred.values))
