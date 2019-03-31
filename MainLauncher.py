@@ -80,7 +80,7 @@ if __name__ == '__main__':
     labels = preprocess.labels_
 
     x_train, x_test, y_train, y_test = train_test_split(
-        df , labels, train_size=train_percentage, random_state=42, stratify=labels)
+        df , labels, train_size=train_percentage, random_state=3, stratify=labels.values)
 
     cn2 = MyCN2(beam_width=beam_width,
                 min_significance=min_significance,
@@ -89,11 +89,31 @@ if __name__ == '__main__':
     start = time()
     cn2.fit(x_train)
     print('Train duration', time()-start)
+    print('No of selectors:', len(cn2.selectors))
+    print()
+    start = time()
+    pred = cn2.predict(x_train, y_train)
+    print('Test duration', time()-start)
+    print()
+    print('Precision, Recall, F-Score:')
+    print(precision_recall_fscore_support(y_train.values, pred.values))
+    print()
+    print('Unique labels:')
+    print(labels.loc[:, 'Class'].unique())
+    print()
+    print('Precision, Recall, F-Score per label:')
+    print(precision_recall_fscore_support(y_train.values, pred.values, labels=labels.loc[:, 'Class'].unique()))
+    print('Accuracy')
+    print(accuracy_score(y_train.values, pred.values))
+    print()
 
+    print('-------------')
+    print('Test')
+    print()
     start = time()
     pred = cn2.predict(x_test, y_test)
     print('Test duration', time()-start)
-
+    print()
     print('Precision, Recall, F-Score:')
     print(precision_recall_fscore_support(y_test.values, pred.values))
     print()
