@@ -63,7 +63,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
 
                 # remove from e the e_prime
                 e = e[~rule_filter]
-                #print(e.shape)
+                print(e.shape)
         
         rule_stats = {}
         rule_default = [('True')]
@@ -238,16 +238,23 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 rule_stats['coverage'] = complex_coverage.shape[0]
 
                 rule_stats['train_precision'] = self.df_rules.loc[ind, 'precision']
-                 # take the most frequent class for this rule
+                # take the most frequent class for this rule
                 rule_stats['true_most_freq_value'] = complex_coverage.loc[:,'Class'].value_counts().index[0]
-                rule_stats['correct'] = class_freq[0]
-                rule_stats['accuracy'] = class_freq[0]/complex_coverage.shape[0]
-                most_freq_class_in_dataset = global_class_freqs.loc[class_freq.index[0]]
-                rule_stats['recall'] = class_freq[0] / most_freq_class_in_dataset
-                rule_stats['significance'] = self.calc_significance(class_freq, 
+                if class_freq.shape[0] > 0:
+                    rule_stats['correct'] = class_freq[0]
+                    rule_stats['accuracy'] = class_freq[0]/complex_coverage.shape[0]
+                    most_freq_class_in_dataset = global_class_freqs.loc[class_freq.index[0]]
+                    rule_stats['recall'] = class_freq[0] / most_freq_class_in_dataset
+                    rule_stats['significance'] = self.calc_significance(class_freq, 
                                                                 complex_coverage.shape[0],
                                                                 global_class_freqs,
                                                                 df_shape)
+                else:
+                    rule_stats['correct'] = 0
+                    rule_stats['accuracy'] = 0
+                    rule_stats['recall'] = 0
+                    rule_stats['significance'] = 0
+                    
                 rule_lst.append(rule_stats)
             df_test = df_test[~rule_filter]
         if df_test.shape[0] > 0:
@@ -277,7 +284,6 @@ class MyCN2(BaseEstimator, TransformerMixin):
                                                             df_shape)
             rule_lst.append(rule_stats)
 
-        print(y_test)
         df_results = pd.DataFrame(rule_lst)
         print(df_results)
         return y_test.loc[:, 'Predictions']
