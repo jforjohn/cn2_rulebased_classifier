@@ -41,9 +41,9 @@ def rules2file(file_path, rules):
             for tup in rule[:-1]:
                 att, val, negate = tup
                 if negate:
-                    fd.write(f'{att} != {val} {liaison}')
+                    fd.write(f'{att} != {val} {liaison} ')
                 else:
-                    fd.write(f'{att} == {val} {liaison}')
+                    fd.write(f'{att} == {val} {liaison} ')
             att, val, negate = rules.loc[ind,'rule'][-1]
             if negate:
                 fd.write(f'{att} != {val} ')
@@ -133,8 +133,13 @@ if __name__ == '__main__':
     df = preprocess.new_df
     labels = preprocess.labels_
 
-    x_train, x_test, y_train, y_test = train_test_split(
-        df , labels, train_size=train_percentage, random_state=42, stratify=labels.values)
+    try:
+        x_train, x_test, y_train, y_test = train_test_split(
+            df , labels, train_size=train_percentage, random_state=42, stratify=labels.values)
+    except ValueError:
+        # for the case of the least populated class in y to have only 1 member
+        x_train, x_test, y_train, y_test = train_test_split(
+            df , labels, train_size=train_percentage, random_state=42)
 
     cn2 = MyCN2(beam_width=beam_width,
                 min_significance=min_significance,
