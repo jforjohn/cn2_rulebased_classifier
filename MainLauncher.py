@@ -6,10 +6,58 @@ from MyPreprocessing import MyPreprocessing
 from MyCN2 import MyCN2
 import sys
 from time import time
+from os import path
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
 ##
+def rules2file(file_path, rules):
+    with open(file_path, 'w') as fd:
+        if cn2.disjunctive:
+            liaison = 'or'
+        else:
+            liaison = 'and'
+
+        fd.write('if ')
+        # first rule
+        for tup in rules.loc[0,'rule'][:-1]:
+            att, val, negate = tup
+            if negate:
+                fd.write(f'{att} != {val} {liaison}')
+            else:
+                fd.write(f'{att} == {val} {liaison}')
+        att, val, negate = rules.loc[0,'rule'][-1]
+        if negate:
+            fd.write(f'{att} != {val} ')
+        else:
+            fd.write(f'{att} == {val} ')
+        pred = rules.loc[0, 'prediction']
+        fd.write(f'then {pred}\n')
+
+        # all rules following except the last one which is the defalut one
+        for ind, row in rules.iloc[1:-1].iterrows():
+            rule = row.loc['rule']
+            fd.write('elif ')
+            for tup in rule[:-1]:
+                att, val, negate = tup
+                if negate:
+                    fd.write(f'{att} != {val} {liaison}')
+                else:
+                    fd.write(f'{att} == {val} {liaison}')
+            att, val, negate = rules.loc[ind,'rule'][-1]
+            if negate:
+                fd.write(f'{att} != {val} ')
+            else:
+                fd.write(f'{att} == {val} ')
+            pred = row.loc['prediction']
+            fd.write(f'then {pred}\n')
+
+        # default rule
+        fd.write('else ')
+        default = rules.loc[rules.shape[0]-1,'rule']
+        fd.write(f'{default}')
+        pred = rules.loc[rules.shape[0]-1, 'prediction']
+        fd.write(f'then {pred}\n')
 
 ##
 if __name__ == '__main__':
@@ -26,9 +74,9 @@ if __name__ == '__main__':
 
     ##
     dataset = config.get('cn2', 'dataset')
-    path = 'datasets/' + dataset + '.arff'
+    data_path = 'datasets/' + dataset + '.arff'
     try:
-        data, meta = loadarff(path)
+        data, meta = loadarff(data_path)
     except FileNotFoundError:
         print("Dataset '%s' cannot be found in the path %s" %(dataset, path))
         sys.exit(1)
@@ -69,6 +117,12 @@ if __name__ == '__main__':
         print('train_percentage should be float, default: 0.7')
         train_percentage = 0.7
 
+    try:
+        output_dir = config.get('cn2', 'output_dir')
+    except ValueError:
+        print('output_dir should be float, default: outputs')
+        train_percentage = 'outputs'
+
     print("###")
     print(dataset)
     print("###")
@@ -80,12 +134,22 @@ if __name__ == '__main__':
     labels = preprocess.labels_
 
     x_train, x_test, y_train, y_test = train_test_split(
-        df , labels, train_size=train_percentage, random_state=3, stratify=labels.values)
+        df , labels, train_size=train_percentage, random_state=4)#, stratify=labels.values)
 
     cn2 = MyCN2(beam_width=beam_width,
                 min_significance=min_significance,
                 negate=negate,
                 disjunctive=disjunctive)
+
+    print('Train model')
+    start = time()
+    cn2.fit(df)
+    print('Train duration', time()-start)
+    rules = cn2.df_rules.loc[:, ['rule','prediction']]
+
+    file_path = path.join(output_dir, f'{dataset}-model.txt')
+    rules2file(file_path, rules)
+    print('------------------------------------')
     start = time()
     cn2.fit(x_train)
     print('Train duration', time()-start)
@@ -107,7 +171,7 @@ if __name__ == '__main__':
     print(accuracy_score(y_train.values, pred.values))
     print()
 
-    print('-------------')
+    print('TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT')
     print('Test')
     print()
     start = time()
