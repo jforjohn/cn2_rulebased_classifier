@@ -54,10 +54,10 @@ def rules2file(file_path, rules):
 
         # default rule
         fd.write('else ')
-        default = rules.loc[rules.shape[0]-1,'rule']
-        fd.write(f'{default}')
+        #default = rules.loc[rules.shape[0]-1,'rule'][0]
+        #fd.write(f'{default} then ')
         pred = rules.loc[rules.shape[0]-1, 'prediction']
-        fd.write(f'then {pred}\n')
+        fd.write(f'{pred}\n')
 
 ##
 if __name__ == '__main__':
@@ -134,7 +134,7 @@ if __name__ == '__main__':
     labels = preprocess.labels_
 
     x_train, x_test, y_train, y_test = train_test_split(
-        df , labels, train_size=train_percentage, random_state=4)#, stratify=labels.values)
+        df , labels, train_size=train_percentage, random_state=42, stratify=labels.values)
 
     cn2 = MyCN2(beam_width=beam_width,
                 min_significance=min_significance,
@@ -144,35 +144,74 @@ if __name__ == '__main__':
     print('Train model')
     start = time()
     cn2.fit(df)
-    print('Train duration', time()-start)
-    rules = cn2.df_rules.loc[:, ['rule','prediction']]
-
-    file_path = path.join(output_dir, f'{dataset}-model.txt')
-    rules2file(file_path, rules)
-    print('------------------------------------')
-    start = time()
-    cn2.fit(x_train)
-    print('Train duration', time()-start)
     print('No of selectors:', len(cn2.selectors))
+    print('Train duration', time()-start)
+    print()
+
+    print('Test of the whole train model')
     print()
     start = time()
-    pred = cn2.predict(x_train, y_train)
+    pred = cn2.predict(df, labels)
     print('Test duration', time()-start)
-    print()
+
     print('Precision, Recall, F-Score:')
-    print(precision_recall_fscore_support(y_train.values, pred.values))
+    print(precision_recall_fscore_support(labels.values, pred.values))
     print()
     print('Unique labels:')
     print(labels.loc[:, 'Class'].unique())
     print()
     print('Precision, Recall, F-Score per label:')
-    print(precision_recall_fscore_support(y_train.values, pred.values, labels=labels.loc[:, 'Class'].unique()))
+    print(precision_recall_fscore_support(labels.values, pred.values, labels=labels.loc[:, 'Class'].unique()))
+    print()
+    print('Accuracy')
+    print(accuracy_score(labels.values, pred.values))
+    print()
+
+    rules = cn2.df_rules.loc[:, ['rule','prediction']]
+    file_path = path.join(output_dir, f'{dataset}-negate-{str(cn2.negate)[0]}-disjunctive-{str(cn2.disjunctive)[0]}-model.txt')
+    rules2file(file_path, rules)
+    print()
+
+    print('------------------------------------')
+    print()
+    print('Train set')
+    print()
+    cn2 = MyCN2(beam_width=beam_width,
+                min_significance=min_significance,
+                negate=negate,
+                disjunctive=disjunctive)
+    start = time()
+    cn2.fit(x_train)
+    print('Train duration', time()-start)
+
+    print()
+    print('Test accuracy of the train set')
+
+    rules = cn2.df_rules.loc[:, ['rule','prediction']]
+    file_path = path.join(output_dir, f'{dataset}-negate-{str(cn2.negate)[0]}-disjunctive-{str(cn2.disjunctive)[0]}-trainset-model.txt')
+    rules2file(file_path, rules)
+
+    start = time()
+    pred = cn2.predict(x_train, y_train)
+    print('Test duration', time()-start)
+    print()
+    
+    print('Precision, Recall, F-Score:')
+    print(precision_recall_fscore_support(y_train.values, pred.values))
+    print()
+    print('Unique labels:')
+    print(y_train.loc[:, 'Class'].unique())
+    print()
+    print('Precision, Recall, F-Score per label:')
+    print(precision_recall_fscore_support(y_train.values, pred.values, labels=y_train.loc[:, 'Class'].unique()))
+    print()
     print('Accuracy')
     print(accuracy_score(y_train.values, pred.values))
     print()
 
     print('TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT')
-    print('Test')
+    print()
+    print('Test set')
     print()
     start = time()
     pred = cn2.predict(x_test, y_test)
@@ -182,9 +221,10 @@ if __name__ == '__main__':
     print(precision_recall_fscore_support(y_test.values, pred.values))
     print()
     print('Unique labels:')
-    print(labels.loc[:, 'Class'].unique())
+    print(y_test.loc[:, 'Class'].unique())
     print()
     print('Precision, Recall, F-Score per label:')
-    print(precision_recall_fscore_support(y_test.values, pred.values, labels=labels.loc[:, 'Class'].unique()))
+    print(precision_recall_fscore_support(y_test.values, pred.values, labels=y_test.loc[:, 'Class'].unique()))
+    print()
     print('Accuracy')
     print(accuracy_score(y_test.values, pred.values))
