@@ -91,6 +91,11 @@ class MyCN2(BaseEstimator, TransformerMixin):
         print(self.df_rules)
         print('negate', self.negate)
         print('disjunctive', self.disjunctive)
+        print()
+        print('#####df_rules#####')
+        print(df_rules.values.tolist())
+        print('##################')
+        print()
         return self
 
 
@@ -154,7 +159,8 @@ class MyCN2(BaseEstimator, TransformerMixin):
                             ascending=asc_order).iloc[:self.beam_width]
 
                 best_cpx = results['rule'].iloc[0]
-                best_significance = results['significance'].iloc[0]
+                #best_significance = results['significance'].iloc[0]
+                best_significance = df_best_cpxs['significance'].iloc[0]
                 star = df_best_cpxs['rule'].values.tolist()
             else:
                 star = []
@@ -286,6 +292,11 @@ class MyCN2(BaseEstimator, TransformerMixin):
 
         df_results = pd.DataFrame(rule_lst)
         print(df_results)
+        print()
+        print('#####df_results#####')
+        print(df_results.values.tolist())
+        print('##################')
+        print()
         return y_test.loc[:, 'Predictions']
 
     def calc_significance(self, class_freq, complex_coverage_size, global_class_freqs, df_shape):
