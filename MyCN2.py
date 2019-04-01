@@ -146,17 +146,21 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 #else:
                 #    del new_star[ind]
             if rule_lst:
-                sort_order = ['entropy', 'significance', 'length', 'coverage']
+                sort_order_best = ['entropy', 'length', 'coverage']
                 #sort_order = ['coverage', 'entropy', 'significance']
-                asc_order = [True, False, True, False]
-                df_best_cpxs = pd.DataFrame(rule_lst).sort_values(by=sort_order,
-                        ascending=asc_order).iloc[:self.beam_width-1]
+                asc_order_best = [True, True, False]
+
+                #sort_order_significance = ['entropy', 'length']
+                #asc_order_significance = [True, True]
+                
+                df_best_cpxs = pd.DataFrame(rule_lst).sort_values(by=sort_order_best,
+                        ascending=asc_order_best).iloc[:self.beam_width-1]
 
                 #print('df_best_cpxs', df_best_cpxs)
                 results = results.append(df_best_cpxs)
                 #print('results', results)
-                results = results.sort_values(by=sort_order,
-                            ascending=asc_order).iloc[:self.beam_width]
+                results = results.sort_values(by=sort_order_best,
+                            ascending=asc_order_best).iloc[:self.beam_width]
 
                 best_cpx = results['rule'].iloc[0]
                 #best_significance = results['significance'].iloc[0]
@@ -164,6 +168,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 star = df_best_cpxs['rule'].values.tolist()
             else:
                 star = []
+        # TODO: to be complete we can handle the return when results is empty
         return results.iloc[0,:], best_cpx
 
 
@@ -280,14 +285,20 @@ class MyCN2(BaseEstimator, TransformerMixin):
             rule_stats['train_precision'] = self.df_rules.loc[ind, 'precision']
                 # take the most frequent class for this rule
             rule_stats['true_most_freq_value'] = complex_coverage.loc[:,'Class'].value_counts().index[0]
-            rule_stats['correct'] = class_freq[0]
-            rule_stats['accuracy'] = class_freq[0]/complex_coverage.shape[0]
-            most_freq_class_in_dataset = global_class_freqs.loc[class_freq.index[0]]
-            rule_stats['recall'] = class_freq[0] / most_freq_class_in_dataset
-            rule_stats['significance'] = self.calc_significance(class_freq, 
-                                                            complex_coverage.shape[0],
-                                                            global_class_freqs,
-                                                            df_shape)
+            if class_freq.shape[0] > 0:
+                rule_stats['correct'] = class_freq[0]
+                rule_stats['accuracy'] = class_freq[0]/complex_coverage.shape[0]
+                most_freq_class_in_dataset = global_class_freqs.loc[class_freq.index[0]]
+                rule_stats['recall'] = class_freq[0] / most_freq_class_in_dataset
+                rule_stats['significance'] = self.calc_significance(class_freq, 
+                                                                complex_coverage.shape[0],
+                                                                global_class_freqs,
+                                                                df_shape)
+            else:
+                rule_stats['correct'] = 0
+                rule_stats['accuracy'] = 0
+                rule_stats['recall'] = 0
+                rule_stats['significance'] = 0
             rule_lst.append(rule_stats)
 
         df_results = pd.DataFrame(rule_lst)
