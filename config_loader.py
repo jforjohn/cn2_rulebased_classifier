@@ -8,6 +8,7 @@ def load(config_file):
     """
     requiredConfig = {
         'cn2': ['dataset',
+                'output_dir'
                 #'bins_no',
                 #'beam_width',
                 #'min_significance',
