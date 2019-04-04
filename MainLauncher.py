@@ -32,7 +32,7 @@ def rules2file(file_path, rules):
         else:
             fd.write(f'{att} == {val} ')
         pred = rules.loc[0, 'prediction']
-        fd.write(f'then {pred}\n')
+        fd.write(f'then\n  {pred}\n')
 
         # all rules following except the last one which is the defalut one
         for ind, row in rules.iloc[1:-1].iterrows():
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     except ValueError:
         print('bins_no should be integer, default: 5')
         bins_no = 5
-
+    
     try:
         beam_width = config.getint('cn2', 'beam_width')
     except ValueError:
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     print()
 
     rules = cn2.df_rules.loc[:, ['rule','prediction']]
-    file_path = path.join(output_dir, f'{dataset}-negate-{str(cn2.negate)[0]}-disjunctive-{str(cn2.disjunctive)[0]}-model.txt')
+    file_path = path.join(output_dir, f'{dataset}-signficance-{str(cn2.min_significance)}-k-{str(cn2.beam_width)}-model.txt')
     rules2file(file_path, rules)
     print()
 
@@ -193,7 +193,7 @@ if __name__ == '__main__':
     print('Test accuracy of the train set')
 
     rules = cn2.df_rules.loc[:, ['rule','prediction']]
-    file_path = path.join(output_dir, f'{dataset}-negate-{str(cn2.negate)[0]}-disjunctive-{str(cn2.disjunctive)[0]}-trainset-model.txt')
+    file_path = path.join(output_dir, f'{dataset}-significance-{str(cn2.min_significance)}-k-{str(cn2.beam_width)}-trainset-model.txt')
     rules2file(file_path, rules)
 
     start = time()
