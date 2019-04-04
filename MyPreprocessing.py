@@ -15,7 +15,8 @@ class MyPreprocessing(BaseEstimator, TransformerMixin):
     def fit(self, data):
         
         df = pd.DataFrame(data)
-        df = df.replace(b'?', None)
+        df = df.replace(b'?', np.nan)
+        df = df.replace('?', np.nan)
         # rename class column to be consistent
         df.columns = df.columns[:-1].values.tolist() + ['Class']
 
@@ -38,8 +39,8 @@ class MyPreprocessing(BaseEstimator, TransformerMixin):
                 df_obj = df_obj.drop([col], axis=1)
                 df.loc[:, col] = int_col
             except ValueError:
-                df_obj.loc[:, col] = df_obj.loc[:,col].apply(lambda x: x.decode('utf-8'))
                 df_obj.loc[:, col] = df_obj.loc[:,col].fillna(df_obj.loc[:,col].mode()[0])
+                df_obj.loc[:, col] = df_obj.loc[:,col].apply(lambda x: x.decode('utf-8'))
             
         df_num = df.select_dtypes(exclude='object')
         df_num_process = pd.DataFrame()
