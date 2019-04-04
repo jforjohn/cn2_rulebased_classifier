@@ -2,6 +2,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 import pandas as pd
 import numpy as np
 from scipy.stats import entropy
+from scipy.stats import power_divergence, chisquare, chi2
 import matplotlib.pyplot as plt
 from matplotlib import style
 style.use('ggplot')
@@ -63,7 +64,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
 
                 # remove from e the e_prime
                 e = e[~rule_filter]
-                print(e.shape)
+                #print(e.shape)
         
         rule_stats = {}
         rule_default = [('True')]
@@ -89,12 +90,13 @@ class MyCN2(BaseEstimator, TransformerMixin):
         self.df_rules = df_rules.append(pd.DataFrame([rule_stats]))
         self.df_rules.reset_index(drop=True, inplace=True)
         print(self.df_rules)
+        print('min_significance', self.min_significance)
         print('negate', self.negate)
         print('disjunctive', self.disjunctive)
         print()
-        print('#####df_rules#####')
-        print(df_rules.values.tolist())
-        print('##################')
+        #print('#####df_rules#####')
+        #print(df_rules.values.tolist())
+        #print('##################')
         print()
         return self
 
@@ -103,7 +105,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
         # initial simple example of star
         star = [()]
         best_cpx = None
-        best_significance = 1
+        best_significance = 10
         results = pd.DataFrame()
         while len(star) > 0 and best_significance > self.min_significance:
             new_star = list(filter(None, self.specialization(star)))
@@ -153,23 +155,31 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 #sort_order_significance = ['entropy', 'length']
                 #asc_order_significance = [True, True]
                 
-                df_best_cpxs = pd.DataFrame(rule_lst).sort_values(by=sort_order_best,
-                        ascending=asc_order_best).iloc[:self.beam_width-1]
+                df_best_cpxs = pd.DataFrame(rule_lst)
+                df_best_cpxs = df_best_cpxs[df_best_cpxs.loc[:,'significance'] > self.min_significance]
+                if not df_best_cpxs.empty:
+                    #df_best_cpxs = df_best_cpxs.sort_values(by=['coverage'], ascending=[False])
+                    df_best_cpxs = df_best_cpxs.sort_values(by=sort_order_best,
+                            ascending=asc_order_best).iloc[:self.beam_width-1]
 
-                #print('df_best_cpxs', df_best_cpxs)
-                results = results.append(df_best_cpxs)
-                #print('results', results)
-                results = results.sort_values(by=sort_order_best,
-                            ascending=asc_order_best).iloc[:self.beam_width]
+                    #print('df_best_cpxs', df_best_cpxs)
+                    results = results.append(df_best_cpxs)
+                    #print('results', results)
+                    results = results.sort_values(by=sort_order_best,
+                                ascending=asc_order_best).iloc[:self.beam_width]
 
-                best_cpx = results['rule'].iloc[0]
-                #best_significance = results['significance'].iloc[0]
-                best_significance = df_best_cpxs['significance'].iloc[0]
-                star = df_best_cpxs['rule'].values.tolist()
+                    best_cpx = results['rule'].iloc[0]
+                    #best_significance = results['significance'].iloc[0]
+                    #best_significance = df_best_cpxs['significance'].iloc[0]
+                    star = df_best_cpxs['rule'].values.tolist()
+                else:
+                    best_significance = 0
             else:
                 star = []
-        # TODO: to be complete we can handle the return when results is empty
-        return results.iloc[0,:], best_cpx
+        if results.empty:
+            return results, best_cpx
+        else:
+            return results.iloc[0,:], best_cpx
 
 
     def specialization(self, star):
@@ -226,7 +236,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
         # don't iterate through the default rule
         last_rule_ind = self.df_rules.shape[0]-2
         for ind, rule in enumerate(self.df_rules.loc[:last_rule_ind, 'rule']):
-            print('test shape', df_test.shape)
+            #print('test shape', df_test.shape)
             rule_stats = {}
             
             rule_filter = self.build_rule_filter(rule, df_test)
@@ -269,7 +279,7 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 rule_lst.append(rule_stats)
             df_test = df_test[~rule_filter]
         if df_test.shape[0] > 0:
-            print('DEFAULT')
+            #print('DEFAULT')
             complex_coverage = df_test
             ind = self.df_rules.shape[0]-2
             rule = self.df_rules.loc[ind, 'rule']
@@ -301,19 +311,35 @@ class MyCN2(BaseEstimator, TransformerMixin):
                 rule_stats['significance'] = 0
             rule_lst.append(rule_stats)
 
-        df_results = pd.DataFrame(rule_lst)
+        df_results = pd.DataFrame(rule_lst).reset_index(drop=True)
         print(df_results)
-        print()
-        print('#####df_results#####')
-        print(df_results.values.tolist())
-        print('##################')
-        print()
+        #print()
+        #print('#####df_results#####')
+        #print(df_results.values.tolist())
+        #print('##################')
+        #print()
         return y_test.loc[:, 'Predictions']
 
     def calc_significance(self, class_freq, complex_coverage_size, global_class_freqs, df_shape):
-        fi = class_freq/complex_coverage_size
-        ei = global_class_freqs/df_shape[0]
-        return 2*(fi*np.log(fi/ei)).sum()
+        # allign the distributions
+        freqs_distr = pd.concat([class_freq, global_class_freqs], axis=1, sort=False)
+        observed_freqs = freqs_distr.iloc[:,0].fillna(0).values
+        expected_freqs = freqs_distr.iloc[:,1].values
+        _, p = chisquare(observed_freqs)#, f_exp=ei)#, lambda_='log-likelihood')
+        #fi = observed_freqs/complex_coverage_size
+        #ei = expected_freqs/df_shape[0]
+        #print(2*(fi*np.log(fi/ei)).sum())
+        #stat, p = power_divergence(observed, lambda_='log-likelihood')
+        #stat1, p1 = power_divergence(global_class_freqs, lambda_='log-likelihood')
+        #print(power_divergence(observed, lambda_='log-likelihood'))
+        #print(-2*np.log(stat/stat1))
+        #print()
+        #lr = sum(fi * (np.log(fi/ei)))*2
+        #p = chi2.cdf(lr, len(fi)-1)
+        if p:
+            return 1-p
+        else:
+            return 0
 
     def build_rule_filter(self, cpx, e):
         rule_pos = {}
